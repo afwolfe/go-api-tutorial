@@ -14,6 +14,10 @@ RUN --mount=type=cache,target=/var/cache/apk \
     apk update && \
     apk add bash
 
+RUN adduser -S appuser
+
+USER appuser
+
 COPY scripts/wait-for-it.sh ./
 COPY --from=builder /src/app ./
 
