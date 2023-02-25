@@ -9,8 +9,14 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 FROM alpine:3 as app
 WORKDIR /app
+
+RUN --mount=type=cache,target=/var/cache/apk \
+    apk update && \
+    apk add bash
+
+COPY scripts/wait-for-it.sh ./
 COPY --from=builder /src/app ./
 
 ENV PORT=8080
 EXPOSE 8080
-CMD [ "./app" ]
+CMD ["./wait-for-it.sh", "--host=db", "--port=3306", "--timeout=60", "--", "./app"]

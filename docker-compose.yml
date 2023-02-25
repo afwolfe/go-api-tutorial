@@ -1,11 +1,30 @@
 
 services:
+  db:
+    image: mariadb:10
+    environment:
+      - MARIADB_ROOT_PASSWORD=password
+      - MARIADB_USER=appuser
+      - MARIADB_PASSWORD=password
+    ports:
+      - 3306:3306
+    volumes:
+      - books_db:/var/lib/mysql
   app:
     image: go-api-tutorial:latest
     build: 
       dockerfile: Dockerfile
       context: .
     environment:
-      - PORT=${PORT:-8080}
+      - PORT=8080
+      - DB_HOST=db
+      - DB_USER=appuser
+      - DB_PASSWORD=password
     ports:
       - 8080:8080
+    depends_on:
+      - db
+    command: ["./wait-for-it.sh", "--host=db", "--port=3306", "--timeout=60", "--", "./app"]
+
+volumes:
+  books_db:

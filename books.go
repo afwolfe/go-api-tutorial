@@ -1,33 +1,30 @@
 package main
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-func BookAddRoutes(router *gin.Engine) {
-	router.GET("/books", GetBooks)
-	router.GET("/books/:id", GetBookById)
-	router.POST("/books", CreateBook)
-	router.PATCH("/books/:id/checkout", PatchCheckoutBookById)
-	router.PATCH("/books/:id/return", PatchReturnBookById)
+type Book struct {
+	Id       string `json:"id"`
+	Title    string `json:"title"`
+	Author   string `json:"author"`
+	Quantity int    `json:"quantity"`
 }
 
-func BookById(id string) (*book, error) {
-	for i, b := range books {
-		if b.Id == id {
-			return &books[i], nil
-		}
-	}
-	return nil, errors.New("book not found")
+func bookAddRoutes(router *gin.Engine) {
+	router.GET("/books", GetBooks)
+	router.GET("/books/:id", GetBookById)
+	router.POST("/books", PostCreateBook)
+	router.PATCH("/books/:id/checkout", PatchCheckoutBookById)
+	router.PATCH("/books/:id/return", PatchReturnBookById)
 }
 
 func PatchCheckoutBookById(c *gin.Context) {
 	id := c.Param("id")
 
-	book, err := BookById(id)
+	book, err := bookById(id)
 
 	if err != nil {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": err.Error()})
@@ -37,13 +34,18 @@ func PatchCheckoutBookById(c *gin.Context) {
 		return
 	}
 	book.Quantity -= 1
-	c.IndentedJSON(http.StatusOK, book)
+	updatedBook, err2 := updateBook(*book)
+	if err2 != nil {
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "Unknown error occurred borrowing book."})
+		return
+	}
+	c.IndentedJSON(http.StatusOK, updatedBook)
 }
 
 func PatchReturnBookById(c *gin.Context) {
 	id := c.Param("id")
 
-	book, err := BookById(id)
+	book, err := bookById(id)
 
 	if err != nil {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": err.Error()})
@@ -51,12 +53,17 @@ func PatchReturnBookById(c *gin.Context) {
 	}
 
 	book.Quantity += 1
-	c.IndentedJSON(http.StatusOK, book)
+	updatedBook, err2 := updateBook(*book)
+	if err2 != nil {
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "Unknown error occurred returning book."})
+		return
+	}
+	c.IndentedJSON(http.StatusOK, updatedBook)
 }
 
 func GetBookById(c *gin.Context) {
 	id := c.Param("id")
-	book, err := BookById(id)
+	book, err := bookById(id)
 
 	if err != nil {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": err.Error()})
@@ -67,16 +74,26 @@ func GetBookById(c *gin.Context) {
 }
 
 func GetBooks(c *gin.Context) {
+	books, err := listBooks()
+
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
 	c.IndentedJSON(http.StatusOK, books)
 }
 
-func CreateBook(c *gin.Context) {
-	var newBook book
+func PostCreateBook(c *gin.Context) {
+	var newBook Book
 	if err := c.BindJSON(&newBook); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, nil)
 		return
 	}
 
-	books = append(books, newBook)
-	c.IndentedJSON(http.StatusCreated, newBook)
+	createdBook, err := createBook(newBook)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "An unknown error occurred while creating the book."})
+		return
+	}
+	c.IndentedJSON(http.StatusCreated, createdBook)
 }
